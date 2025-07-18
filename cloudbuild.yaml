@@ -1,3 +1,7 @@
+# Opcje logowania
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 steps:
 # Budowanie obrazu Docker
 - name: 'gcr.io/cloud-builders/docker'
