@@ -7,8 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "concurrently \"npm run server\" \"npm run dev\"",
-    "server": "cd server && npm start"
+    "start": "NODE_ENV=production node server/server.js",
+    "start:dev": "concurrently \"npm run server:dev\" \"npm run dev\"",
+    "server:dev": "cd server && npm start",
+    "deploy": "npm run build && gcloud app deploy",
+    "gcp-build": "npm run build"
   },
   "dependencies": {
     "framer-motion": "^10.16.4",

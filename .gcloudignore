@@ -1,0 +1,13 @@
+# Pliki i katalogi ignorowane przez Google Cloud
+.git
+.gitignore
+node_modules/
+npm-debug.log
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+__MACOSX/
+*.md
+!README.md

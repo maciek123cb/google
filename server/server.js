@@ -8,6 +8,12 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+// Import modułu Cloud Storage
+let cloudStorage;
+if (process.env.NODE_ENV === 'production') {
+  cloudStorage = require('./cloud-storage');
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -15,58 +21,103 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Konfiguracja dla plików statycznych
+if (process.env.NODE_ENV === 'production') {
+  // W produkcji używamy Cloud Storage
+  app.use('/uploads', (req, res, next) => {
+    // Przekieruj do Cloud Storage
+    const bucketName = cloudStorage.bucketName;
+    const redirectUrl = `https://storage.googleapis.com/${bucketName}${req.path}`;
+    res.redirect(redirectUrl);
+  });
+  
+  // Serwowanie statycznych plików z katalogu dist (zbudowana aplikacja React)
+  const distPath = path.join(__dirname, '..', 'dist');
+  app.use(express.static(distPath));
+  console.log(`Serwowanie statycznych plików z: ${distPath}`);
+} else {
+  // W środowisku lokalnym używamy lokalnego systemu plików
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+}
 
 // Konfiguracja multer dla uploadów
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, 'uploads', 'metamorphoses');
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
+let upload;
+if (process.env.NODE_ENV === 'production') {
+  // W produkcji przechowujemy pliki w pamięci, aby przesłać je do Cloud Storage
+  upload = multer({
+    storage: multer.memoryStorage(),
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Tylko pliki obrazów są dozwolone!'), false);
+      }
+    },
+    limits: {
+      fileSize: 5 * 1024 * 1024 // 5MB limit
     }
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+  });
+} else {
+  // W środowisku lokalnym zapisujemy pliki na dysku
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      const uploadPath = path.join(__dirname, 'uploads', 'metamorphoses');
+      if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+      }
+      cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+  });
 
-const upload = multer({ 
-  storage: storage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Tylko pliki obrazów są dozwolone!'), false);
+  upload = multer({ 
+    storage: storage,
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Tylko pliki obrazów są dozwolone!'), false);
+      }
+    },
+    limits: {
+      fileSize: 5 * 1024 * 1024 // 5MB limit
     }
-  },
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  }
-});
+  });
+}
 
 // Konfiguracja bazy danych
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'beauty_salon'
 };
 
+// Dodaj konfigurację dla Google Cloud SQL
+if (process.env.DB_HOST && process.env.DB_HOST.includes('/cloudsql/')) {
+  // Jesteśmy w Google Cloud
+  dbConfig.socketPath = process.env.DB_HOST;
+} else {
+  // Lokalne środowisko
+  dbConfig.host = process.env.DB_HOST || 'localhost';
+}
+
 // Połączenie z bazą danych
 let db;
 async function connectDB() {
   try {
-    const connectionConfig = {
-      host: dbConfig.host,
-      user: dbConfig.user,
-      password: dbConfig.password
-    };
+    const connectionConfig = { ...dbConfig };
+    delete connectionConfig.database;
     
-    const tempDb = await mysql.createConnection(connectionConfig);
-    await tempDb.execute('CREATE DATABASE IF NOT EXISTS beauty_salon');
-    await tempDb.end();
+    // W Google Cloud nie tworzymy bazy danych, musi być już utworzona
+    if (!process.env.DB_HOST || !process.env.DB_HOST.includes('/cloudsql/')) {
+      const tempDb = await mysql.createConnection(connectionConfig);
+      await tempDb.execute('CREATE DATABASE IF NOT EXISTS beauty_salon');
+      await tempDb.end();
+    }
     
     db = await mysql.createConnection(dbConfig);
     await createTables();
@@ -1172,8 +1223,17 @@ app.post('/api/admin/metamorphoses', verifyToken, upload.fields([{ name: 'before
       });
     }
     
-    const beforeImagePath = '/uploads/metamorphoses/' + req.files.beforeImage[0].filename;
-    const afterImagePath = '/uploads/metamorphoses/' + req.files.afterImage[0].filename;
+    let beforeImagePath, afterImagePath;
+    
+    if (process.env.NODE_ENV === 'production') {
+      // W produkcji używamy Cloud Storage
+      beforeImagePath = await cloudStorage.uploadFile(req.files.beforeImage[0]);
+      afterImagePath = await cloudStorage.uploadFile(req.files.afterImage[0]);
+    } else {
+      // W środowisku lokalnym używamy lokalnego systemu plików
+      beforeImagePath = '/uploads/metamorphoses/' + req.files.beforeImage[0].filename;
+      afterImagePath = '/uploads/metamorphoses/' + req.files.afterImage[0].filename;
+    }
     
     await db.execute(
       'INSERT INTO metamorphoses (treatment_name, before_image, after_image) VALUES (?, ?, ?)',
@@ -1207,21 +1267,41 @@ app.put('/api/admin/metamorphoses/:id', verifyToken, upload.fields([{ name: 'bef
     
     // Aktualizuj zdjęcia jeśli zostały przesłane
     if (req.files.beforeImage) {
-      // Usuń stare zdjęcie
-      const oldPath = path.join(__dirname, current[0].before_image);
-      if (fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath);
+      if (process.env.NODE_ENV === 'production') {
+        // W produkcji używamy Cloud Storage
+        // Usuń stare zdjęcie
+        if (beforeImagePath.includes('storage.googleapis.com')) {
+          await cloudStorage.deleteFile(beforeImagePath);
+        }
+        beforeImagePath = await cloudStorage.uploadFile(req.files.beforeImage[0]);
+      } else {
+        // W środowisku lokalnym używamy lokalnego systemu plików
+        // Usuń stare zdjęcie
+        const oldPath = path.join(__dirname, current[0].before_image);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+        beforeImagePath = '/uploads/metamorphoses/' + req.files.beforeImage[0].filename;
       }
-      beforeImagePath = '/uploads/metamorphoses/' + req.files.beforeImage[0].filename;
     }
     
     if (req.files.afterImage) {
-      // Usuń stare zdjęcie
-      const oldPath = path.join(__dirname, current[0].after_image);
-      if (fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath);
+      if (process.env.NODE_ENV === 'production') {
+        // W produkcji używamy Cloud Storage
+        // Usuń stare zdjęcie
+        if (afterImagePath.includes('storage.googleapis.com')) {
+          await cloudStorage.deleteFile(afterImagePath);
+        }
+        afterImagePath = await cloudStorage.uploadFile(req.files.afterImage[0]);
+      } else {
+        // W środowisku lokalnym używamy lokalnego systemu plików
+        // Usuń stare zdjęcie
+        const oldPath = path.join(__dirname, current[0].after_image);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+        afterImagePath = '/uploads/metamorphoses/' + req.files.afterImage[0].filename;
       }
-      afterImagePath = '/uploads/metamorphoses/' + req.files.afterImage[0].filename;
     }
     
     await db.execute(
@@ -1250,15 +1330,28 @@ app.delete('/api/admin/metamorphoses/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Metamorfoza nie znaleziona' });
     }
     
-    // Usuń pliki
-    const beforePath = path.join(__dirname, metamorphosis[0].before_image);
-    const afterPath = path.join(__dirname, metamorphosis[0].after_image);
+    const beforeImagePath = metamorphosis[0].before_image;
+    const afterImagePath = metamorphosis[0].after_image;
     
-    if (fs.existsSync(beforePath)) {
-      fs.unlinkSync(beforePath);
-    }
-    if (fs.existsSync(afterPath)) {
-      fs.unlinkSync(afterPath);
+    if (process.env.NODE_ENV === 'production') {
+      // W produkcji używamy Cloud Storage
+      if (beforeImagePath.includes('storage.googleapis.com')) {
+        await cloudStorage.deleteFile(beforeImagePath);
+      }
+      if (afterImagePath.includes('storage.googleapis.com')) {
+        await cloudStorage.deleteFile(afterImagePath);
+      }
+    } else {
+      // W środowisku lokalnym używamy lokalnego systemu plików
+      const beforePath = path.join(__dirname, beforeImagePath);
+      const afterPath = path.join(__dirname, afterImagePath);
+      
+      if (fs.existsSync(beforePath)) {
+        fs.unlinkSync(beforePath);
+      }
+      if (fs.existsSync(afterPath)) {
+        fs.unlinkSync(afterPath);
+      }
     }
     
     await db.execute('DELETE FROM metamorphoses WHERE id = ?', [id]);
@@ -1269,5 +1362,15 @@ app.delete('/api/admin/metamorphoses/:id', verifyToken, async (req, res) => {
     res.status(500).json({ success: false, message: 'Błąd serwera' });
   }
 });
+
+// Obsługa przekierowań dla React Router w trybie produkcyjnym
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    // Pomijamy ścieżki API
+    if (!req.path.startsWith('/api/') && !req.path.startsWith('/uploads/')) {
+      res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    }
+  });
+}
 
 startServer().catch(console.error);

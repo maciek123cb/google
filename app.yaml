@@ -1,0 +1,28 @@
+runtime: nodejs18
+
+instance_class: F1
+
+env_variables:
+  DB_HOST: "/cloudsql/YOUR_INSTANCE_CONNECTION_NAME"
+  DB_USER: "root"
+  DB_PASSWORD: "YOUR_DB_PASSWORD"
+  DB_NAME: "beauty_salon"
+  JWT_SECRET: "YOUR_SECRET_KEY"
+  PORT: "8080"
+  CLOUD_STORAGE_BUCKET: "YOUR_BUCKET_NAME"
+  NODE_ENV: "production"
+
+handlers:
+  - url: /api/.*
+    script: auto
+    secure: always
+
+  - url: /(.*\.(js|css|png|jpg|jpeg|gif|ico|json|avif|PNG))$
+    static_files: dist/\1
+    upload: dist/.*\.(js|css|png|jpg|jpeg|gif|ico|json|avif|PNG)$
+    secure: always
+
+  - url: /.*
+    static_files: dist/index.html
+    upload: dist/index.html
+    secure: always
