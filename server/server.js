@@ -15,7 +15,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Middleware
@@ -133,15 +133,33 @@ async function connectDB() {
     }
     
     console.log('Próba połączenia z bazą danych...');
-    db = await mysql.createConnection(dbConfig);
-    console.log('Połączono z bazą danych, tworzenie tabel...');
-    await createTables();
-    
-    console.log('Połączono z bazą danych MySQL i utworzono tabele');
+    try {
+      db = await mysql.createConnection(dbConfig);
+      console.log('Połączono z bazą danych, tworzenie tabel...');
+      await createTables();
+      console.log('Połączono z bazą danych MySQL i utworzono tabele');
+    } catch (dbError) {
+      console.error('Błąd połączenia z bazą danych:', dbError.message);
+      console.error('Pełny stack błędu:', dbError.stack);
+      console.error('Konfiguracja bazy danych:', dbConfig);
+      
+      // W środowisku produkcyjnym kontynuujemy działanie serwera nawet bez bazy danych
+      if (process.env.NODE_ENV === 'production') {
+        console.log('Kontynuowanie uruchamiania serwera w trybie produkcyjnym mimo błędu bazy danych');
+      } else {
+        process.exit(1);
+      }
+    }
   } catch (error) {
-    console.error('Błąd połączenia z bazą danych:', error.message);
+    console.error('Błąd ogólny podczas konfiguracji bazy danych:', error.message);
     console.error(error.stack);
-    process.exit(1);
+    
+    // W środowisku produkcyjnym kontynuujemy działanie serwera nawet bez bazy danych
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Kontynuowanie uruchamiania serwera w trybie produkcyjnym mimo błędu');
+    } else {
+      process.exit(1);
+    }
   }
 }
 
@@ -887,11 +905,29 @@ async function startServer() {
     console.log('DB_NAME:', process.env.DB_NAME);
     console.log('CLOUD_STORAGE_BUCKET:', process.env.CLOUD_STORAGE_BUCKET);
     
-    await connectDB();
+    try {
+      await connectDB();
+      console.log('Baza danych zainicjalizowana pomyślnie');
+    } catch (dbError) {
+      console.error('Błąd podczas inicjalizacji bazy danych:', dbError);
+      if (process.env.NODE_ENV !== 'production') {
+        process.exit(1);
+      }
+    }
     
     // Upewnij się, że PORT jest liczbą
     const serverPort = parseInt(PORT) || 8080;
     console.log(`Próba uruchomienia serwera na porcie ${serverPort}`);
+    
+    // Dodaj trasę health check dla Google Cloud Run
+    app.get('/health', (req, res) => {
+      res.status(200).send('OK');
+    });
+    
+    // Dodaj trasę root dla Google Cloud Run
+    app.get('/', (req, res) => {
+      res.status(200).send('Serwer działa poprawnie');
+    });
     
     const server = app.listen(serverPort, '0.0.0.0', () => {
       console.log(`Serwer działa na porcie ${serverPort}`);

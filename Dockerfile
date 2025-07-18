@@ -30,8 +30,7 @@ ENV PORT=8080
 # Kopiowanie pliku .env.cloud do .env w katalogu server
 RUN cp .env.cloud server/.env
 
-# Utworzenie prostego pliku startowego
-RUN echo 'console.log("Uruchamianie aplikacji..."); require("./server/server.js");' > server-start.js
+# Plik server-start.js jest już w repozytorium
 
 # Uruchomienie aplikacji
 CMD ["node", "server-start.js"]
