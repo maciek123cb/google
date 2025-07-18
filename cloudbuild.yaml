@@ -1,0 +1,14 @@
+steps:
+# Instalacja zależności
+- name: 'node:16'
+  entrypoint: 'npm'
+  args: ['install']
+
+# Budowanie aplikacji
+- name: 'node:16'
+  entrypoint: 'npm'
+  args: ['run', 'build']
+
+# Wdrażanie do App Engine
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['app', 'deploy']

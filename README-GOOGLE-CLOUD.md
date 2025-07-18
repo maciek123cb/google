@@ -34,7 +34,55 @@
    - `YOUR_DB_PASSWORD`: Ustaw hasło do bazy danych
    - `YOUR_SECRET_KEY`: Ustaw bezpieczny klucz JWT
 
-## Wdrażanie aplikacji
+## Wdrażanie aplikacji z GitHub
+
+1. Upewnij się, że Twój kod jest w repozytorium GitHub.
+
+2. Połącz Google Cloud z repozytorium GitHub:
+   - Przejdź do [Google Cloud Console](https://console.cloud.google.com/)
+   - Wybierz swój projekt
+   - Przejdź do Cloud Build > Triggers
+   - Kliknij "Connect Repository"
+   - Wybierz GitHub jako dostawcę kodu
+   - Autoryzuj Google Cloud do dostępu do GitHub
+   - Wybierz swoje repozytorium
+
+3. Utwórz plik `cloudbuild.yaml` w głównym katalogu projektu:
+   ```yaml
+   steps:
+   # Instalacja zależności
+   - name: 'node:16'
+     entrypoint: 'npm'
+     args: ['install']
+   
+   # Budowanie aplikacji
+   - name: 'node:16'
+     entrypoint: 'npm'
+     args: ['run', 'build']
+   
+   # Wdrażanie do App Engine
+   - name: 'gcr.io/cloud-builders/gcloud'
+     args: ['app', 'deploy']
+   ```
+
+4. Utwórz trigger w Cloud Build:
+   - Przejdź do Cloud Build > Triggers
+   - Kliknij "Create Trigger"
+   - Nazwij trigger (np. "deploy-from-main")
+   - Wybierz swoje repozytorium
+   - Wybierz branch (np. "main")
+   - W sekcji Configuration wybierz "Cloud Build configuration file"
+   - Ustaw ścieżkę do pliku: `cloudbuild.yaml`
+   - Kliknij "Create"
+
+5. Po zakończeniu konfiguracji, każdy push do wybranego brancha automatycznie uruchomi proces wdrażania.
+
+6. Po zakończeniu wdrażania, aplikacja będzie dostępna pod adresem:
+   ```
+   https://[YOUR-PROJECT-ID].appspot.com
+   ```
+
+## Wdrażanie ręczne
 
 1. Zbuduj aplikację i wdróż ją na Google App Engine:
    ```
@@ -45,11 +93,6 @@
    ```
    npm run build
    gcloud app deploy
-   ```
-
-2. Po zakończeniu wdrażania, aplikacja będzie dostępna pod adresem:
-   ```
-   https://[YOUR-PROJECT-ID].appspot.com
    ```
 
 ## Rozwiązywanie problemów
