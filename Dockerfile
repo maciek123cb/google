@@ -17,8 +17,12 @@ RUN npm run build
 # Konfiguracja dla App Engine
 COPY app.yaml .
 
-# Ekspozycja portu (domyślnie 8080 dla App Engine)
+# Ekspozycja portu (domyślnie 8080 dla App Engine/Cloud Run)
 EXPOSE 8080
 
+# Ustawienie zmiennych środowiskowych
+ENV NODE_ENV=production
+ENV PORT=8080
+
 # Uruchomienie aplikacji
-CMD ["npm", "start"]
+CMD ["node", "server/server.js"]

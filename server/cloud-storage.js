@@ -1,80 +1,61 @@
-// Moduł do obsługi Google Cloud Storage
 const { Storage } = require('@google-cloud/storage');
-const path = require('path');
-const os = require('os');
-const fs = require('fs');
 
-// Inicjalizacja Cloud Storage
+// Inicjalizacja klienta Cloud Storage
 const storage = new Storage();
-const bucketName = process.env.CLOUD_STORAGE_BUCKET || 'beauty-salon-uploads';
+const bucketName = process.env.CLOUD_STORAGE_BUCKET || 'your-bucket-name';
+const bucket = storage.bucket(bucketName);
 
-// Funkcja do przesyłania pliku do Cloud Storage
+/**
+ * Przesyła plik do Cloud Storage
+ * @param {Object} file - Obiekt pliku z multer
+ * @returns {Promise<string>} - URL do przesłanego pliku
+ */
 async function uploadFile(file) {
   try {
-    // Sprawdź czy bucket istnieje, jeśli nie - utwórz go
-    try {
-      await storage.bucket(bucketName).get();
-    } catch (error) {
-      if (error.code === 404) {
-        await storage.createBucket(bucketName, {
-          location: 'europe-west3',
-          storageClass: 'STANDARD'
-        });
-        console.log(`Bucket ${bucketName} został utworzony.`);
-      } else {
-        throw error;
-      }
-    }
-
-    const bucket = storage.bucket(bucketName);
-    const fileName = `metamorphoses/${Date.now()}-${file.originalname}`;
-    const blob = bucket.file(fileName);
-    
-    // Utwórz strumień zapisu
+    const blob = bucket.file(`uploads/metamorphoses/${Date.now()}-${file.originalname}`);
     const blobStream = blob.createWriteStream({
       resumable: false,
       contentType: file.mimetype
     });
-    
-    // Obsługa błędów i zakończenia przesyłania
+
     return new Promise((resolve, reject) => {
-      blobStream.on('error', (error) => {
-        reject(error);
+      blobStream.on('error', (err) => {
+        console.error('Błąd przesyłania pliku:', err);
+        reject(err);
       });
-      
+
       blobStream.on('finish', () => {
-        // Ustaw plik jako publicznie dostępny
-        blob.makePublic().then(() => {
-          const publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
-          resolve(publicUrl);
-        }).catch(reject);
+        const publicUrl = `https://storage.googleapis.com/${bucketName}/${blob.name}`;
+        resolve(publicUrl);
       });
-      
-      // Przesyłanie pliku
+
       blobStream.end(file.buffer);
     });
   } catch (error) {
-    console.error('Błąd przesyłania pliku do Cloud Storage:', error);
+    console.error('Błąd uploadFile:', error);
     throw error;
   }
 }
 
-// Funkcja do usuwania pliku z Cloud Storage
+/**
+ * Usuwa plik z Cloud Storage
+ * @param {string} fileUrl - URL pliku do usunięcia
+ * @returns {Promise<void>}
+ */
 async function deleteFile(fileUrl) {
   try {
-    if (!fileUrl || !fileUrl.includes('storage.googleapis.com')) {
-      console.warn('Nieprawidłowy URL pliku:', fileUrl);
+    // Wyciągnij nazwę pliku z URL
+    const urlParts = fileUrl.split(`${bucketName}/`);
+    if (urlParts.length < 2) {
+      console.error('Nieprawidłowy URL pliku:', fileUrl);
       return;
     }
     
-    // Wyodrębnij nazwę pliku z URL
-    const urlParts = fileUrl.split('/');
-    const fileName = urlParts.slice(4).join('/'); // Pomijamy 'https://storage.googleapis.com/bucket-name/'
-    
-    await storage.bucket(bucketName).file(fileName).delete();
-    console.log(`Plik ${fileName} został usunięty.`);
+    const fileName = urlParts[1];
+    await bucket.file(fileName).delete();
+    console.log(`Plik ${fileName} został usunięty`);
   } catch (error) {
-    console.error('Błąd usuwania pliku z Cloud Storage:', error);
+    console.error('Błąd deleteFile:', error);
     throw error;
   }
 }
