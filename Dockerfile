@@ -1,4 +1,4 @@
-FROM node:16
+FROM node:20
 
 WORKDIR /app
 
@@ -27,8 +27,11 @@ EXPOSE 8080
 ENV NODE_ENV=production
 ENV PORT=8080
 
+# Kopiowanie pliku .env.cloud do .env w katalogu server
+RUN cp .env.cloud server/.env
+
 # Utworzenie prostego pliku startowego
-RUN echo 'console.log("Uruchamianie aplikacji..."); require("./server/app.js");' > server-start.js
+RUN echo 'console.log("Uruchamianie aplikacji..."); require("./server/server.js");' > server-start.js
 
 # Uruchomienie aplikacji
 CMD ["node", "server-start.js"]

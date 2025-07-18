@@ -1,28 +1,14 @@
-runtime: nodejs18
-
-instance_class: F1
+runtime: nodejs20
 
 env_variables:
-  DB_HOST: "/cloudsql/serene-notch-466304-d8:europe-central2:beauty-salon-db"
+  NODE_ENV: "production"
+  PORT: "8080"
+  DB_HOST: "/cloudsql/serene-notch-466304-d8:europe-west1:beauty-salon"
   DB_USER: "root"
   DB_PASSWORD: "Adamkopec123"
   DB_NAME: "beauty_salon"
-  JWT_SECRET: "Adamkopec123"
-  PORT: "8080"
-  CLOUD_STORAGE_BUCKET: "YOUR_BUCKET_NAME"
-  NODE_ENV: "production"
+  JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
+  CLOUD_STORAGE_BUCKET: "wiktoriabeuty-uploads"
 
-handlers:
-  - url: /api/.*
-    script: auto
-    secure: always
-
-  - url: /(.*\.(js|css|png|jpg|jpeg|gif|ico|json|avif|PNG))$
-    static_files: dist/\1
-    upload: dist/.*\.(js|css|png|jpg|jpeg|gif|ico|json|avif|PNG)$
-    secure: always
-
-  - url: /.*
-    static_files: dist/index.html
-    upload: dist/index.html
-    secure: always
+beta_settings:
+  cloud_sql_instances: "serene-notch-466304-d8:europe-west1:beauty-salon"

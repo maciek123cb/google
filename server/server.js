@@ -99,9 +99,11 @@ const dbConfig = {
 // Dodaj konfigurację dla Google Cloud SQL
 if (process.env.DB_HOST && process.env.DB_HOST.includes('/cloudsql/')) {
   // Jesteśmy w Google Cloud
+  console.log('Wykryto środowisko Google Cloud SQL, używam socketPath:', process.env.DB_HOST);
   dbConfig.socketPath = process.env.DB_HOST;
 } else {
   // Lokalne środowisko
+  console.log('Używam lokalnego połączenia z bazą danych:', process.env.DB_HOST || 'localhost');
   dbConfig.host = process.env.DB_HOST || 'localhost';
 }
 
@@ -109,22 +111,36 @@ if (process.env.DB_HOST && process.env.DB_HOST.includes('/cloudsql/')) {
 let db;
 async function connectDB() {
   try {
+    console.log('Próba połączenia z bazą danych z konfiguracją:', {
+      host: dbConfig.host || dbConfig.socketPath,
+      user: dbConfig.user,
+      database: dbConfig.database
+    });
+    
     const connectionConfig = { ...dbConfig };
     delete connectionConfig.database;
     
     // W Google Cloud nie tworzymy bazy danych, musi być już utworzona
     if (!process.env.DB_HOST || !process.env.DB_HOST.includes('/cloudsql/')) {
-      const tempDb = await mysql.createConnection(connectionConfig);
-      await tempDb.execute('CREATE DATABASE IF NOT EXISTS beauty_salon');
-      await tempDb.end();
+      console.log('Tworzenie bazy danych w środowisku lokalnym');
+      try {
+        const tempDb = await mysql.createConnection(connectionConfig);
+        await tempDb.execute('CREATE DATABASE IF NOT EXISTS beauty_salon');
+        await tempDb.end();
+      } catch (err) {
+        console.error('Błąd podczas tworzenia bazy danych:', err);
+      }
     }
     
+    console.log('Próba połączenia z bazą danych...');
     db = await mysql.createConnection(dbConfig);
+    console.log('Połączono z bazą danych, tworzenie tabel...');
     await createTables();
     
-    console.log('Połączono z bazą danych MySQL');
+    console.log('Połączono z bazą danych MySQL i utworzono tabele');
   } catch (error) {
     console.error('Błąd połączenia z bazą danych:', error.message);
+    console.error(error.stack);
     process.exit(1);
   }
 }
@@ -864,6 +880,13 @@ app.post('/api/admin/appointments/manual', verifyToken, async (req, res) => {
 // Inicjalizacja i uruchomienie serwera
 async function startServer() {
   try {
+    // Wyświetl informacje o środowisku
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('PORT:', process.env.PORT);
+    console.log('DB_HOST:', process.env.DB_HOST);
+    console.log('DB_NAME:', process.env.DB_NAME);
+    console.log('CLOUD_STORAGE_BUCKET:', process.env.CLOUD_STORAGE_BUCKET);
+    
     await connectDB();
     
     // Upewnij się, że PORT jest liczbą
@@ -885,6 +908,7 @@ async function startServer() {
     });
   } catch (error) {
     console.error('Błąd podczas uruchamiania serwera:', error);
+    console.error(error.stack);
     process.exit(1);
   }
 }

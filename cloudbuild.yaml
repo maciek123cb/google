@@ -25,5 +25,5 @@ steps:
     '--timeout', '300s',
     '--cpu', '1',
     '--memory', '512Mi',
-    '--set-env-vars', 'NODE_ENV=production,PORT=8080,DB_HOST=/cloudsql/serene-notch-466304-d8:europe-central2:beauty-salon-db,DB_USER=root,DB_PASSWORD=Adamkopec123,DB_NAME=beauty_salon,JWT_SECRET=Adamkopec123,CLOUD_STORAGE_BUCKET=serene-notch-466304-d8.appspot.com'
+    '--set-env-vars', 'NODE_ENV=production,PORT=8080,DB_HOST=/cloudsql/serene-notch-466304-d8:europe-west1:beauty-salon,DB_USER=root,DB_PASSWORD=Adamkopec123,DB_NAME=beauty_salon,JWT_SECRET=Adamkopec123,CLOUD_STORAGE_BUCKET=wiktoriabeuty-uploads'
   ]

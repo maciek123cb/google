@@ -2,7 +2,8 @@ const { Storage } = require('@google-cloud/storage');
 
 // Inicjalizacja klienta Cloud Storage
 const storage = new Storage();
-const bucketName = process.env.CLOUD_STORAGE_BUCKET || 'your-bucket-name';
+const bucketName = process.env.CLOUD_STORAGE_BUCKET || 'wiktoriabeuty-uploads';
+console.log('Używam bucketa Cloud Storage:', bucketName);
 const bucket = storage.bucket(bucketName);
 
 /**
