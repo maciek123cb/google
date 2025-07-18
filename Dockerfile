@@ -31,6 +31,10 @@ ENV DB_USER="root"
 ENV DB_PASSWORD="Adamkopec123"
 ENV DB_NAME="beauty_salon"
 ENV JWT_SECRET="Adamkopec123"
+ENV CLOUD_STORAGE_BUCKET="serene-notch-466304-d8.appspot.com"
+
+# Dodanie skryptu startowego
+RUN echo '#!/bin/sh\nnode server/server.js' > start.sh && chmod +x start.sh
 
 # Uruchomienie aplikacji
-CMD ["node", "server/server.js"]
+CMD ["/app/start.sh"]

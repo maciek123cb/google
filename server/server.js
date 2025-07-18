@@ -863,20 +863,30 @@ app.post('/api/admin/appointments/manual', verifyToken, async (req, res) => {
 
 // Inicjalizacja i uruchomienie serwera
 async function startServer() {
-  await connectDB();
-  
-  const server = app.listen(PORT, () => {
-    console.log(`Serwer działa na porcie ${PORT}`);
-  });
-  
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${PORT} jest już zajęty. Zatrzymaj poprzedni serwer lub użyj innego portu.`);
-      process.exit(1);
-    } else {
-      console.error('Błąd serwera:', err);
-    }
-  });
+  try {
+    await connectDB();
+    
+    // Upewnij się, że PORT jest liczbą
+    const serverPort = parseInt(PORT) || 8080;
+    console.log(`Próba uruchomienia serwera na porcie ${serverPort}`);
+    
+    const server = app.listen(serverPort, '0.0.0.0', () => {
+      console.log(`Serwer działa na porcie ${serverPort}`);
+    });
+    
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${serverPort} jest już zajęty. Zatrzymaj poprzedni serwer lub użyj innego portu.`);
+        process.exit(1);
+      } else {
+        console.error('Błąd serwera:', err);
+        process.exit(1);
+      }
+    });
+  } catch (error) {
+    console.error('Błąd podczas uruchamiania serwera:', error);
+    process.exit(1);
+  }
 }
 
 // ENDPOINTY DLA USŁUG
