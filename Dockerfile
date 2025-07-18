@@ -33,4 +33,4 @@ RUN cp .env.cloud server/.env
 # Plik server-start.js jest już w repozytorium
 
 # Uruchomienie aplikacji
-CMD ["node", "server-start.js"]
+CMD ["node", "start.js"]

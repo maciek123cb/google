@@ -1,3 +1,4 @@
+// Uruchamianie aplikacji
 console.log("Uruchamianie aplikacji...");
 
 // Dodanie obsługi nieobsłużonych wyjątków
@@ -14,7 +15,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 try {
   console.log("Próba załadowania server.js...");
-  require("./server/server.js");
+  const server = require("./server/server.js");
   console.log("Server.js załadowany pomyślnie");
 } catch (error) {
   console.error("Błąd podczas ładowania server.js:", error);
